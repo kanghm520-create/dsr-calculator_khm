@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light}html{-webkit-text-size-adjust:100%}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>주담대 DSR 계산기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 모바일 단일 컬럼(최대 560px). 입력 3카드 → 핵심 결과 → 접이식 상세. 하단 고정 요약 바.
+   Color: 네이비-슬레이트 중립 + 코발트 액센트 1개. 판정색(good/warn/bad)은 별도. */
+:root {
+  --bg: #eef1f4; --surface: #ffffff; --surface-2: #f6f8fa;
+  --ink: #15212c; --muted: #596a7a; --line: #d8dfe6; --line-strong: #b9c4cf;
+  --accent: #2349b8; --accent-soft: #e3eaff; --accent-ink: #ffffff;
+  --good: #1b7a4b; --good-soft: #def3e7;
+  --warn: #9a6200; --warn-soft: #fbefd2;
+  --bad: #b3261e; --bad-soft: #fde5e2;
+  --font: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e151c; --surface: #16202a; --surface-2: #1b2733;
+    --ink: #e6edf3; --muted: #92a3b3; --line: #29384a; --line-strong: #3b4d61;
+    --accent: #8aa9ff; --accent-soft: #1d2c52; --accent-ink: #0e151c;
+    --good: #4cc38a; --good-soft: #14352a;
+    --warn: #e2ad45; --warn-soft: #3a2d10;
+    --bad: #ff8a7d; --bad-soft: #43201d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e151c; --surface: #16202a; --surface-2: #1b2733;
+  --ink: #e6edf3; --muted: #92a3b3; --line: #29384a; --line-strong: #3b4d61;
+  --accent: #8aa9ff; --accent-soft: #1d2c52; --accent-ink: #0e151c;
+  --good: #4cc38a; --good-soft: #14352a;
+  --warn: #e2ad45; --warn-soft: #3a2d10;
+  --bad: #ff8a7d; --bad-soft: #43201d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.55; padding-inline: 16px; padding-block: 18px 96px; }
+.page { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+h1 { font-size: 21px; line-height: 1.3; margin: 0; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 13px; margin: 0 0 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+h3 { font-size: 14px; margin: 14px 0 8px; font-weight: 600; }
+p { margin: 0; }
+.sub { color: var(--muted); margin-top: 3px; font-size: 14px; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.pill { font-family: var(--mono); font-size: 12px; padding: 3px 9px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--muted); background: var(--surface); white-space: nowrap; }
+.pill b { color: var(--ink); font-weight: 500; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field > label, .lab { font-size: 12px; color: var(--muted); font-weight: 500; }
+.span2 { grid-column: span 2; } .span3 { grid-column: span 3; }
+.inp { position: relative; display: flex; align-items: center; }
+input[type=number], select { width: 100%; min-width: 0; min-height: 44px; font: inherit; font-size: 16px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 6px; padding: 8px 10px; }
+input[type=number] { font-family: var(--mono); font-variant-numeric: tabular-nums; padding-right: 58px; text-align: right; }
+.inp .u { position: absolute; right: 10px; color: var(--muted); font-size: 12px; pointer-events: none; }
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hint { font-size: 12px; color: var(--muted); min-height: 17px; font-variant-numeric: tabular-nums; }
+.qa { display: flex; flex-wrap: wrap; gap: 6px; }
+.qa button { min-height: 32px; padding: 3px 10px; font-size: 12.5px; font-family: var(--mono); border-radius: 999px; background: var(--surface); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; min-height: 36px; }
+.field > label.check { font-size: 14px; color: var(--ink); font-weight: 400; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.debts { display: flex; flex-direction: column; gap: 10px; }
+.debt { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; background: var(--surface-2); }
+.debt .rm { align-self: end; justify-self: end; }
+button { font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); padding: 8px 14px; min-height: 40px; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.ghost { background: transparent; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+details > summary { cursor: pointer; font-weight: 600; font-size: 14px; min-height: 32px; display: flex; align-items: center; }
+details[open] > summary { margin-bottom: 10px; }
+.regbox { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--ink); }
+.tag.reg { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); font-weight: 600; }
+.tag.metro { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); font-weight: 600; }
+.tag.local { background: var(--good-soft); border-color: var(--good); color: var(--good); font-weight: 600; }
+.hero .k { font-size: 12px; color: var(--muted); }
+.hero .v { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hero .s { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.chip { display: inline-block; font-size: 11px; font-family: var(--mono); padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--line-strong); vertical-align: middle; }
+.verdict { margin-top: 12px; border-radius: 6px; padding: 10px 12px; border: 1px solid; display: flex; flex-direction: column; gap: 2px; }
+.verdict.ok { background: var(--good-soft); border-color: var(--good); }
+.verdict.no { background: var(--bad-soft); border-color: var(--bad); }
+.verdict.mid { background: var(--warn-soft); border-color: var(--warn); }
+.verdict.idle { background: var(--surface-2); border-color: var(--line); }
+.verdict .vt { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
+.verdict.ok .vt { color: var(--good); } .verdict.no .vt { color: var(--bad); } .verdict.mid .vt { color: var(--warn); }
+.verdict .head { font-size: 16px; font-weight: 700; line-height: 1.4; text-wrap: balance; }
+.verdict .body { font-size: 14px; }
+.gauge { margin-top: 14px; }
+.gbar { position: relative; height: 22px; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 4px; overflow: hidden; display: flex; }
+.gbar i { display: block; height: 100%; }
+.gbar .g-ex { background: var(--muted); opacity: .75; }
+.gbar .g-new { background: var(--accent); }
+.gbar .g-over { background: var(--bad); }
+.gmark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.glabels { position: relative; height: 18px; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.glabels span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.legend b { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; font-weight: 500; color: var(--muted); }
+td.n, th.n { text-align: right; }
+tr.base td { background: var(--accent-soft); }
+tr.total td { font-weight: 700; border-top: 2px solid var(--line-strong); }
+.bar { height: 5px; background: var(--line); border-radius: 3px; margin-top: 4px; min-width: 60px; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.up { color: var(--good); } .down { color: var(--bad); }
+.opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+.opt { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--surface-2); min-width: 0; }
+.opt .k { font-size: 11.5px; color: var(--muted); }
+.opt .v { font-size: 14.5px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.small { font-size: 12.5px; color: var(--muted); }
+ul.assume { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+textarea.copybox { width: 100%; min-height: 150px; font-family: var(--mono); font-size: 12px; background: var(--surface-2); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 6px; padding: 8px; }
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--surface); border-top: 1px solid var(--line-strong); padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); }
+.dock-in { max-width: 560px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; }
+.dock .k { font-size: 11.5px; color: var(--muted); }
+.dock .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.dock .r { text-align: right; font-size: 12.5px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: var(--muted); }
+.dot.ok { background: var(--good); } .dot.no { background: var(--bad); } .dot.mid { background: var(--warn); }
+@media (prefers-reduced-motion: no-preference) { .gbar i { transition: width .25s ease; } }
+</style>
+
+<div class="page">
+  <header>
+    <h1>주택담보대출 DSR 계산기</h1>
+    <p class="sub">지역과 조건을 넣으면 신규 주담대 한도와 줄여야 할 부채를 알려줍니다.</p>
+    <div class="pills">
+      <span class="pill">은행권 <b>DSR 40%</b></span>
+      <span class="pill"><b>스트레스 DSR 3단계</b> · 2026.10 확인</span>
+    </div>
+  </header>
+
+  <form id="f" class="stack" autocomplete="off">
+    <section class="card">
+      <h2>기본 정보 <span class="small" style="font-weight:400;letter-spacing:0">· 금액 입력 단위는 백만원</span></h2>
+      <div class="grid2">
+        <div class="field"><label for="sido">시·도</label><select id="sido"></select></div>
+        <div class="field"><label for="sgg">시·군·구</label><select id="sgg"></select></div>
+      </div>
+      <div class="regbox" id="regInfo"></div>
+      <div class="grid2" style="margin-top:14px">
+        <div class="field"><label for="income">연소득</label>
+          <div class="inp"><input type="number" id="income" inputmode="decimal" step="any" min="0"><span class="u">백만원</span></div>
+          <div class="hint" id="h_income"></div>
+          <div class="qa"><button type="button" data-t="income" data-v="10">+1천만</button><button type="button" data-t="income" data-v="100">+1억</button></div></div>
+        <div class="field"><label for="price">주택가격 (시세·감정가)</label>
+          <div class="inp"><input type="number" id="price" inputmode="decimal" step="any" min="0"><span class="u">백만원</span></div>
+          <div class="hint" id="h_price"></div>
+          <div class="qa"><button type="button" data-t="price" data-v="100">+1억</button><button type="button" data-t="price" data-v="500">+5억</button></div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>신규 주택담보대출</h2>
+      <div class="field"><label for="desired">희망 대출금액</label>
+        <div class="inp"><input type="number" id="desired" inputmode="decimal" step="any" min="0"><span class="u">백만원</span></div>
+        <div class="hint" id="h_desired"></div>
+        <div class="qa"><button type="button" data-t="desired" data-v="10">+1천만</button><button type="button" data-t="desired" data-v="100">+1억</button></div></div>
+      <div class="grid3" style="margin-top:12px">
+        <div class="field"><label for="rate">금리 (실제)</label>
+          <div class="inp"><input type="number" id="rate" inputmode="decimal" step="0.01" min="0"><span class="u">%</span></div></div>
+        <div class="field"><label for="term">기간</label>
+          <div class="inp"><input type="number" id="term" inputmode="decimal" step="1" min="1" max="50"><span class="u">년</span></div></div>
+        <div class="field"><label for="grace">거치</label>
+          <div class="inp"><input type="number" id="grace" inputmode="decimal" step="1" min="0"><span class="u">년</span></div></div>
+      </div>
+      <div class="qa" style="margin-top:8px">
+        <button type="button" data-t="rate" data-v="0.1" data-d="2">+0.1%</button><button type="button" data-t="rate" data-v="0.5" data-d="2">+0.5%</button><button type="button" data-t="rate" data-v="1" data-d="2">+1%</button>
+        <button type="button" data-t="term" data-v="5" data-max="50">+5년</button><button type="button" data-t="term" data-v="10" data-max="50">+10년</button>
+      </div>
+      <p class="small" style="margin-top:8px">금리는 은행 고시 금융채(6개월물·5년물)에 가산금리를 더한 실제 대출금리를 입력하세요.</p>
+      <details style="margin-top:14px">
+        <summary>상세 조건 (상환방식 · 금리유형 · 보유상태)</summary>
+        <div class="grid2">
+          <div class="field"><label for="method">상환방식</label>
+            <select id="method"><option value="annuity">원리금균등</option><option value="equal">원금균등</option></select></div>
+          <div class="field"><label for="rateType">금리유형</label><select id="rateType"></select></div>
+          <div class="field"><label for="hold">주택 보유 상태</label><select id="hold"></select></div>
+          <div class="field"><label for="senior">선순위 채권·방공제</label>
+            <div class="inp"><input type="number" id="senior" inputmode="decimal" step="any" min="0"><span class="u">백만원</span></div></div>
+          <div class="field span2"><label class="check" for="purchase"><input type="checkbox" id="purchase"> 주택 구입 자금 (가격구간 상한·만기 30년 제한 적용 대상)</label></div>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <div class="row" style="margin-bottom:12px">
+        <h2 style="margin:0">기존 부채</h2>
+        <button type="button" id="btnAdd">+ 추가</button>
+      </div>
+      <div class="debts" id="debts"></div>
+      <p class="small" style="margin-top:10px">기존 대출은 실제 금리로 계산합니다. 마이너스통장은 약정한도의 90%, 만기일시 신용대출은 5년 분할로 환산합니다.</p>
+    </section>
+  </form>
+
+  <section class="stack" id="results" aria-live="polite"></section>
+
+  <section class="card">
+    <details>
+      <summary>세부 기준 (규정이 바뀌면 수정)</summary>
+      <p class="small" style="margin-bottom:10px">비워두면 지역·금리유형에 맞는 기본값(칸 안의 회색 숫자)을 씁니다.</p>
+      <form id="adv" autocomplete="off">
+        <div class="grid2">
+          <div class="field span2"><label for="regOverride">규제지역 여부</label>
+            <select id="regOverride"><option value="auto">선택한 지역 기준 자동</option><option value="reg">규제지역으로 계산</option><option value="non">비규제로 계산</option></select></div>
+          <div class="field"><label for="dsrLimit">DSR 한도</label><div class="inp"><input type="number" id="dsrLimit" step="1" min="1"><span class="u">%</span></div></div>
+          <div class="field"><label for="ltv">LTV</label><div class="inp"><input type="number" id="ltv" step="1" min="0"><span class="u">%</span></div></div>
+          <div class="field"><label for="stressRate">스트레스 금리</label><div class="inp"><input type="number" id="stressRate" step="0.01" min="0"><span class="u">%p</span></div></div>
+          <div class="field"><label for="baseRatio">기본 적용비율</label><div class="inp"><input type="number" id="baseRatio" step="1" min="0"><span class="u">%</span></div></div>
+        </div>
+        <h3>금리유형별 스트레스 반영비율</h3>
+        <div class="grid2" id="trGrid"></div>
+        <h3>수도권·규제지역 주택구입 상한</h3>
+        <label class="check" for="priceCapOn"><input type="checkbox" id="priceCapOn"> 주택가격 구간별 대출 상한 적용</label>
+        <div class="grid3">
+          <div class="field"><label for="cap1">15억 이하</label><div class="inp"><input type="number" id="cap1" step="any" min="0"><span class="u">백만원</span></div></div>
+          <div class="field"><label for="cap2">15~25억</label><div class="inp"><input type="number" id="cap2" step="any" min="0"><span class="u">백만원</span></div></div>
+          <div class="field"><label for="cap3">25억 초과</label><div class="inp"><input type="number" id="cap3" step="any" min="0"><span class="u">백만원</span></div></div>
+        </div>
+        <div class="stack" style="margin-top:12px;gap:8px">
+          <label class="check" for="matCap"><input type="checkbox" id="matCap"> 수도권·규제지역 구입 주담대 DSR 만기 30년 제한 가정</label>
+          <div class="field"><label for="graceMode">거치기간 DSR 반영</label>
+            <select id="graceMode"><option value="shorten">원금상환 기간만큼만 분할 (보수적)</option><option value="ignore">거치 무시 (전체 만기로 분할)</option></select></div>
+        </div>
+      </form>
+      <div class="row" style="margin-top:14px"><span class="small">입력값은 이 브라우저에 자동 저장됩니다.</span><button type="button" id="btnReset" class="ghost">예시로 되돌리기</button></div>
+    </details>
+  </section>
+</div>
+
+<div class="dock" id="dock"><div class="dock-in" id="dockIn"></div></div>
+
+<script>
+/* ===== DSR ENGINE v2 (엔진 내부 단위: 만원, 이율: %) ===== */
+const METRO_SIDO = ['서울특별시', '경기도', '인천광역시'];
+const SIDO_LIST = ['서울특별시', '경기도', '인천광역시', '부산광역시', '대구광역시', '광주광역시', '대전광역시', '울산광역시', '세종특별자치시', '강원특별자치도', '충청북도', '충청남도', '전북특별자치도', '전라남도', '경상북도', '경상남도', '제주특별자치도'];
+const SEOUL_GU = ['강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구', '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구', '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구'];
+const GG_LIST = ['가평군', '고양시 덕양구', '고양시 일산동구', '고양시 일산서구', '과천시', '광명시', '광주시', '구리시', '군포시', '김포시', '남양주시', '동두천시', '부천시', '성남시 분당구', '성남시 수정구', '성남시 중원구', '수원시 권선구', '수원시 영통구', '수원시 장안구', '수원시 팔달구', '시흥시', '안산시 단원구', '안산시 상록구', '안성시', '안양시 동안구', '안양시 만안구', '양주시', '양평군', '여주시', '연천군', '오산시', '용인시 기흥구', '용인시 수지구', '용인시 처인구', '의왕시', '의정부시', '이천시', '파주시', '평택시', '포천시', '하남시', '화성시 동탄구', '화성시 (동탄구 외)'];
+const INCHEON_LIST = ['강화군', '계양구', '남동구', '동구', '미추홀구', '부평구', '서구', '연수구', '옹진군', '중구'];
+/* 규제지역(조정대상·투기과열): 서울 25개구 전체 + 경기 15곳 (2026.7.1 지정 기준) */
+const GG_REG = new Set(['과천시', '광명시', '성남시 분당구', '성남시 수정구', '성남시 중원구', '수원시 영통구', '수원시 장안구', '수원시 팔달구', '안양시 동안구', '용인시 수지구', '용인시 기흥구', '의왕시', '하남시', '구리시', '화성시 동탄구']);
+
+function sggList(sido) {
+  if (sido === '서울특별시') return SEOUL_GU;
+  if (sido === '경기도') return GG_LIST;
+  if (sido === '인천광역시') return INCHEON_LIST;
+  return [];
+}
+function regionAuto(sido, sgg) {
+  const metro = METRO_SIDO.indexOf(sido) >= 0;
+  const reg = sido === '서울특별시' || (sido === '경기도' && GG_REG.has(sgg));
+  return { metro, reg };
+}
+
+const HOLDS = { none: '무주택', first: '생애최초', one: '1주택 (처분조건부)' };
+const TYPE_RATIOS = {
+  variable: { label: '변동금리 (금융채 6개월물)', ratio: 100 },
+  periodic: { label: '주기형 (금융채 5년물)',     ratio: 30 }
+};
+const DEBT_TYPES = {
+  mortgage:  { label: '주택담보대출',            method: 'annuity',  term: 30, rate: 4.0 },
+  credit:    { label: '신용대출 (만기일시)',      method: 'bullet',   term: 1,  rate: 5.5 },
+  overdraft: { label: '마이너스통장 (약정한도)',  method: 'bullet',   term: 1,  rate: 6.0 },
+  install:   { label: '분할상환 신용대출',        method: 'annuity',  term: 5,  rate: 6.0 },
+  jeonse:    { label: '전세자금대출 (이자만)',    method: 'interest', term: 2,  rate: 3.8 },
+  auto:      { label: '자동차 할부·리스',         method: 'annuity',  term: 3,  rate: 7.0 },
+  card:      { label: '카드론',                  method: 'bullet',   term: 1,  rate: 13.0 },
+  student:   { label: '학자금대출 (DSR 제외)',    method: 'annuity',  term: 10, rate: 2.0 },
+  other:     { label: '기타 대출',               method: 'annuity',  term: 3,  rate: 6.0 }
+};
+const METHODS = { annuity: '원리금균등', equal: '원금균등', bullet: '만기일시', interest: '이자만' };
+
+function defaultLTV(info, hold) {
+  if (hold === 'first') return 70;
+  if (hold === 'one') return info.metro ? 40 : 70;
+  return info.reg ? 40 : 70;
+}
+
+function amortYears(term, grace, mode) {
+  let n = term;
+  if (grace > 0 && mode === 'shorten') n = term - grace;
+  return Math.max(n, 1);
+}
+
+function annualPerUnit(ratePct, term, method, grace, mode, isMortgage) {
+  const r = ratePct / 100;
+  if (method === 'interest') return r;
+  if (method === 'bullet') return 1 / (isMortgage ? Math.max(term, 1) : 5) + r;
+  const N = amortYears(term, grace, mode);
+  if (method === 'equal') return 1 / N + r;
+  const rm = r / 12, n = Math.round(N * 12);
+  if (rm === 0) return 12 / n;
+  return (rm / (1 - Math.pow(1 + rm, -n))) * 12;
+}
+
+function existingAnnual(d, mode) {
+  if (d.type === 'student') return 0;
+  const P = d.type === 'overdraft' ? d.bal * 0.9 : d.bal;
+  return P * annualPerUnit(d.rate, d.term, d.method, d.grace || 0, mode, d.type === 'mortgage');
+}
+
+function core(inp) {
+  const info = inp.regInfo;
+  const metroLike = info.metro || info.reg;
+  const S = inp.stressRate != null ? inp.stressRate : (metroLike ? 3.0 : 1.5);
+  const base = inp.baseRatio != null ? inp.baseRatio : (metroLike ? 100 : 50);
+  const tr = inp.typeRatios[inp.rateType];
+  const add = S * (base / 100) * (tr / 100);
+  const rDsr = inp.rate + add;
+  const capMat = !!(inp.purchase && metroLike && inp.matCap);
+  const effTerm = capMat ? Math.min(inp.term, 30) : inp.term;
+  const effGrace = Math.min(inp.grace, Math.max(effTerm - 1, 0));
+  const perUnit = annualPerUnit(rDsr, effTerm, inp.method, effGrace, inp.graceMode, true);
+  const perUnitNoStress = annualPerUnit(inp.rate, effTerm, inp.method, effGrace, inp.graceMode, true);
+
+  const items = inp.debts.map((d, i) => {
+    const annual = existingAnnual(d, inp.graceMode);
+    const principal = d.type === 'student' ? 0 : (d.type === 'overdraft' ? d.bal * 0.9 : d.bal);
+    return { idx: i, d, annual, principal, eff: d.bal > 0 ? annual / d.bal : 0 };
+  });
+  const E = items.reduce((s, x) => s + x.annual, 0);
+  const lim = inp.dsrLimit / 100;
+  const capAnnual = inp.income * lim;
+  const allowed = capAnnual - E;
+  const pmaxDsr = allowed > 0 && perUnit > 0 ? allowed / perUnit : 0;
+
+  const ltv = inp.ltv != null ? inp.ltv : defaultLTV(info, inp.hold);
+  const ltvCap = inp.price > 0 ? Math.max(inp.price * ltv / 100 - inp.senior, 0) : null;
+  let priceCap = null;
+  if (inp.purchase && metroLike && inp.priceCapOn && inp.price > 0) {
+    priceCap = inp.price <= inp.capBounds[0] ? inp.caps[0] : (inp.price <= inp.capBounds[1] ? inp.caps[1] : inp.caps[2]);
+  }
+  const cands = [{ k: 'DSR', v: pmaxDsr }];
+  if (ltvCap != null) cands.push({ k: 'LTV', v: ltvCap });
+  if (priceCap != null) cands.push({ k: '가격구간 상한', v: priceCap });
+  const bind = cands.reduce((a, b) => (b.v < a.v ? b : a));
+  const capsMin = (ltvCap != null || priceCap != null)
+    ? Math.min(ltvCap != null ? ltvCap : Infinity, priceCap != null ? priceCap : Infinity) : null;
+
+  return {
+    S, base, tr, add, rDsr, capMat, effTerm, effGrace, perUnit, perUnitNoStress,
+    items, E, lim, capAnnual, allowed, pmaxDsr, ltv, ltvCap, priceCap, capsMin,
+    finalLimit: bind.v, binding: bind.k, metroLike
+  };
+}
+
+function reductionPlan(inp, res, target) {
+  const needAnnual = res.E + target * res.perUnit - res.capAnnual;
+  if (needAnnual <= 0) return { need: 0, rows: [], covered: true, shortAnnual: 0, target };
+  const pool = res.items.filter(x => x.annual > 0 && x.d.bal > 0).sort((a, b) => b.eff - a.eff);
+  let remain = needAnnual;
+  const rows = [];
+  for (const x of pool) {
+    if (remain <= 0) break;
+    const cut = Math.min(x.annual, remain);
+    const repay = x.eff > 0 ? Math.min(x.d.bal, cut / x.eff) : 0;
+    rows.push({ item: x, repay, cut, full: repay >= x.d.bal - 0.5 });
+    remain -= cut;
+  }
+  const totalRepay = rows.reduce((s, r) => s + r.repay, 0);
+  return { need: needAnnual, rows, totalRepay, covered: remain <= 0.0001, shortAnnual: Math.max(remain, 0), target };
+}
+
+function scenarios(inp, res) {
+  const out = [];
+  const run = (label, mods, note) => {
+    const r = core({ ...inp, ...mods });
+    out.push({ label, note: note || '', pmax: r.pmaxDsr, final: r.finalLimit, r });
+  };
+  out.push({ label: '현재 입력', note: '', pmax: res.pmaxDsr, final: res.finalLimit, r: res, base: true });
+  [20, 30, 35, 40, 50].forEach(t => {
+    if (t === inp.term) return;
+    const r = core({ ...inp, term: t });
+    if (r.effTerm === res.effTerm) return;
+    out.push({ label: '만기 ' + t + '년', note: '', pmax: r.pmaxDsr, final: r.finalLimit, r });
+  });
+  if (inp.grace > 0) run('거치기간 없음', { grace: 0 });
+  Object.keys(TYPE_RATIOS).forEach(k => {
+    if (k === inp.rateType) return;
+    const r = core({ ...inp, rateType: k });
+    if (Math.abs(r.add - res.add) < 1e-9) return;
+    out.push({ label: TYPE_RATIOS[k].label, note: '금리유형', pmax: r.pmaxDsr, final: r.finalLimit, r });
+  });
+  if (res.add > 0) run('스트레스 가산 없이', { stressRate: 0 }, '참고');
+  run('연소득 +1천만원', { income: inp.income + 1000 }, '합산소득 등');
+  if (res.E > 0) run('기존 부채 전액 상환', { debts: [] });
+  out.forEach(o => { o.delta = o.pmax - res.pmaxDsr; });
+  return out;
+}
+
+function fmtMan(v) {
+  if (!Number.isFinite(v)) return '-';
+  const n = Math.round(v), sign = n < 0 ? '-' : '', a = Math.abs(n);
+  const eok = Math.floor(a / 10000), man = a % 10000;
+  if (eok > 0) return sign + eok.toLocaleString('ko-KR') + '억' + (man ? ' ' + man.toLocaleString('ko-KR') + '만원' : '원');
+  return sign + man.toLocaleString('ko-KR') + (a === 0 ? '원' : '만원');
+}
+const fmtFloor = v => fmtMan(Math.floor(v + 1e-9));
+const fmtCeil = v => fmtMan(Math.ceil(v - 1e-9));
+
+
+const $ = id => document.getElementById(id);
+const M = 100; /* 입력 백만원 → 엔진 만원 */
+const STORE_KEY = 'dsr-calc-v3';
+const EXAMPLE = {
+  f: { sido: '서울특별시', sgg: '송파구', income: 90, price: 1100, senior: 0, purchase: true, hold: 'none',
+       desired: 350, rate: 4.2, term: 30, grace: 0, method: 'annuity', rateType: 'variable',
+       regOverride: 'auto', dsrLimit: '', stressRate: '', baseRatio: '', ltv: '', priceCapOn: true,
+       cap1: 600, cap2: 400, cap3: 200, matCap: true, graceMode: 'shorten' },
+  tr: {},
+  debts: [
+    { type: 'credit', bal: 30, rate: 5.5, term: 1, method: 'bullet' },
+    { type: 'auto', bal: 18, rate: 7.0, term: 3, method: 'annuity' },
+    { type: 'overdraft', bal: 20, rate: 6.0, term: 1, method: 'bullet' }
+  ]
+};
+const FIELD_IDS = ['sido', 'sgg', 'income', 'price', 'senior', 'hold', 'desired', 'rate', 'term', 'grace', 'method', 'rateType', 'regOverride', 'dsrLimit', 'stressRate', 'baseRatio', 'ltv', 'cap1', 'cap2', 'cap3', 'graceMode'];
+const CHECK_IDS = ['purchase', 'priceCapOn', 'matCap'];
+
+function fillMap(id, map, labelKey) {
+  $(id).innerHTML = Object.keys(map).map(k => '<option value="' + k + '">' + (labelKey ? map[k][labelKey] : map[k]) + '</option>').join('');
+}
+$('sido').innerHTML = SIDO_LIST.map(s => '<option>' + s + '</option>').join('');
+fillMap('hold', HOLDS);
+fillMap('rateType', TYPE_RATIOS, 'label');
+$('trGrid').innerHTML = Object.keys(TYPE_RATIOS).map(k =>
+  '<div class="field"><label for="tr_' + k + '">' + TYPE_RATIOS[k].label + '</label><div class="inp"><input type="number" id="tr_' + k + '" step="1" min="0" max="100"><span class="u">%</span></div></div>').join('');
+
+function fillSgg(keep) {
+  const list = sggList($('sido').value);
+  const sel = $('sgg');
+  if (!list.length) { sel.innerHTML = '<option value="">해당 없음 (전 지역 동일)</option>'; sel.disabled = true; return; }
+  sel.disabled = false;
+  sel.innerHTML = list.map(s => '<option>' + s + '</option>').join('');
+  if (keep && list.indexOf(keep) >= 0) sel.value = keep;
+}
+
+function debtRowHTML(d) {
+  const typeOpts = Object.keys(DEBT_TYPES).map(k => '<option value="' + k + '"' + (k === d.type ? ' selected' : '') + '>' + DEBT_TYPES[k].label + '</option>').join('');
+  const mOpts = Object.keys(METHODS).map(k => '<option value="' + k + '"' + (k === d.method ? ' selected' : '') + '>' + METHODS[k] + '</option>').join('');
+  return '<div class="debt">' +
+    '<div class="field span2"><span class="lab">종류</span><select class="d-type">' + typeOpts + '</select></div>' +
+    '<button type="button" class="rm ghost" aria-label="이 부채 삭제">삭제</button>' +
+    '<div class="field"><span class="lab d-ballab">' + (d.type === 'overdraft' ? '약정한도' : '잔액') + '</span><div class="inp"><input type="number" class="d-bal" inputmode="decimal" step="any" min="0" value="' + d.bal + '"><span class="u">백만원</span></div></div>' +
+    '<div class="field"><span class="lab">금리</span><div class="inp"><input type="number" class="d-rate" inputmode="decimal" step="0.01" min="0" value="' + d.rate + '"><span class="u">%</span></div></div>' +
+    '<div class="field"><span class="lab">잔여만기</span><div class="inp"><input type="number" class="d-term" inputmode="decimal" step="any" min="0" value="' + d.term + '"><span class="u">년</span></div></div>' +
+    '<div class="field span3"><span class="lab">상환방식</span><select class="d-method">' + mOpts + '</select></div>' +
+    '</div>';
+}
+function addDebt(d) {
+  const t = d || { type: 'install', bal: 0, rate: DEBT_TYPES.install.rate, term: DEBT_TYPES.install.term, method: DEBT_TYPES.install.method };
+  $('debts').insertAdjacentHTML('beforeend', debtRowHTML(t));
+}
+
+function setForm(src) {
+  const f = src.f;
+  $('sido').value = f.sido; fillSgg(f.sgg);
+  FIELD_IDS.forEach(id => { if (id !== 'sido' && id !== 'sgg' && f[id] !== undefined) $(id).value = f[id]; });
+  if (!TYPE_RATIOS[$('rateType').value]) $('rateType').value = 'variable';
+  CHECK_IDS.forEach(id => { if (f[id] !== undefined) $(id).checked = !!f[id]; });
+  Object.keys(TYPE_RATIOS).forEach(k => { $('tr_' + k).value = (src.tr && src.tr[k] !== undefined) ? src.tr[k] : ''; });
+  $('debts').innerHTML = '';
+  (src.debts || []).forEach(addDebt);
+}
+function numOr(id, def) { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : def; }
+function numOrNull(id) { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; }
+function readState() {
+  const f = {};
+  FIELD_IDS.forEach(id => f[id] = $(id).value);
+  CHECK_IDS.forEach(id => f[id] = $(id).checked);
+  const tr = {}; Object.keys(TYPE_RATIOS).forEach(k => tr[k] = $('tr_' + k).value);
+  const debts = [...document.querySelectorAll('.debt')].map(el => ({
+    type: el.querySelector('.d-type').value,
+    bal: parseFloat(el.querySelector('.d-bal').value) || 0,
+    rate: parseFloat(el.querySelector('.d-rate').value) || 0,
+    term: parseFloat(el.querySelector('.d-term').value) || 0,
+    method: el.querySelector('.d-method').value
+  }));
+  return { f, tr, debts };
+}
+function currentRegion() {
+  const auto = regionAuto($('sido').value, $('sgg').value);
+  const o = $('regOverride').value;
+  if (o === 'reg') return { metro: auto.metro, reg: true };
+  if (o === 'non') return { metro: auto.metro, reg: false };
+  return auto;
+}
+function readInputs() {
+  const tr = {};
+  Object.keys(TYPE_RATIOS).forEach(k => { const v = numOrNull('tr_' + k); tr[k] = v != null ? v : TYPE_RATIOS[k].ratio; });
+  const st = readState();
+  return {
+    regInfo: currentRegion(), hold: $('hold').value, purchase: $('purchase').checked,
+    price: numOr('price', 0) * M, senior: numOr('senior', 0) * M, income: numOr('income', 0) * M,
+    desired: numOr('desired', 0) * M, rate: numOr('rate', 0), term: Math.max(numOr('term', 30), 1),
+    grace: Math.max(numOr('grace', 0), 0), method: $('method').value, rateType: $('rateType').value,
+    dsrLimit: numOr('dsrLimit', 40), stressRate: numOrNull('stressRate'), baseRatio: numOrNull('baseRatio'),
+    typeRatios: tr, ltv: numOrNull('ltv'), matCap: $('matCap').checked, graceMode: $('graceMode').value,
+    priceCapOn: $('priceCapOn').checked,
+    caps: [numOr('cap1', 600) * M, numOr('cap2', 400) * M, numOr('cap3', 200) * M], capBounds: [150000, 250000],
+    debts: st.debts.map(d => ({ type: d.type, bal: d.bal * M, rate: d.rate, term: d.term, method: d.method, grace: 0 }))
+  };
+}
+
+function updateRegion() {
+  const info = currentRegion();
+  const metroLike = info.metro || info.reg;
+  $('stressRate').placeholder = metroLike ? '3.0' : '1.5';
+  $('baseRatio').placeholder = metroLike ? '100' : '50';
+  $('dsrLimit').placeholder = '40';
+  $('ltv').placeholder = String(defaultLTV(info, $('hold').value));
+  Object.keys(TYPE_RATIOS).forEach(k => { $('tr_' + k).placeholder = String(TYPE_RATIOS[k].ratio); });
+  ['cap1', 'cap2', 'cap3'].forEach((id, i) => { $(id).placeholder = String([600, 400, 200][i]); });
+  const place = ($('sido').value + ' ' + ($('sgg').value || '')).trim();
+  const kind = info.reg ? '<span class="tag reg">규제지역</span>' : (info.metro ? '<span class="tag metro">수도권 · 비규제</span>' : '<span class="tag local">비수도권</span>');
+  const stress = metroLike ? '스트레스 금리 3.0% × 100%' : '스트레스 금리 1.5% × 50% (2026년 말까지 유예)';
+  $('regInfo').innerHTML = '<div class="tags">' + kind + '<span class="tag">' + stress + '</span><span class="tag">LTV ' + defaultLTV(info, $('hold').value) + '%</span>' +
+    (metroLike ? '<span class="tag">가격구간 상한·만기 30년 제한</span>' : '') + '</div>' +
+    '<p class="small">' + place + ' · 규제지역은 2026.7.1 지정 기준(서울 전역, 경기 15곳)입니다.</p>';
+}
+function updateHints() {
+  ['income', 'price', 'desired'].forEach(a => {
+    const v = parseFloat($(a).value);
+    $('h_' + a).textContent = Number.isFinite(v) && v > 0 ? '= ' + fmtMan(v * M) : '';
+  });
+}
+
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(readState())); } catch (e) {} }
+function load() { try { const s = localStorage.getItem(STORE_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+
+function gaugeHTML(res, E, newAnn, income) {
+  if (income <= 0) return '';
+  const lim = res.lim * 100, ex = E / income * 100, nw = newAnn / income * 100;
+  const scale = Math.max(lim * 1.4, (ex + nw) * 1.08, 10);
+  const w = v => Math.max(0, Math.min(100, v / scale * 100));
+  const over = ex + nw > lim + 1e-9;
+  let seg = '<i class="g-ex" style="width:' + w(ex) + '%"></i>';
+  if (nw > 0) seg += '<i class="' + (over ? 'g-over' : 'g-new') + '" style="width:' + w(nw) + '%"></i>';
+  return '<div class="gauge"><div class="gbar">' + seg + '<span class="gmark" style="left:' + w(lim) + '%"></span></div>' +
+    '<div class="glabels"><span style="left:' + w(lim) + '%">한도 ' + lim.toFixed(0) + '%</span></div>' +
+    '<div class="legend"><span><b style="background:var(--muted)"></b>기존 ' + ex.toFixed(1) + '%</span>' +
+    (nw > 0 ? '<span><b style="background:' + (over ? 'var(--bad)' : 'var(--accent)') + '"></b>신규 ' + nw.toFixed(1) + '%</span>' : '') +
+    '<span>합계 ' + (ex + nw).toFixed(1) + '%</span></div></div>';
+}
+
+function render() {
+  updateHints();
+  const inp = readInputs();
+  const out = $('results'), dock = $('dockIn');
+  if (inp.income <= 0) {
+    out.innerHTML = '<div class="card hero" id="hero"><div class="verdict idle"><span class="head">연소득을 입력하면 결과가 표시됩니다.</span></div></div>';
+    dock.innerHTML = '<div><div class="k">DSR 기준 최대</div><div class="v">-</div></div><div class="r small">연소득을 입력하세요</div>';
+    return;
+  }
+  const res = core(inp);
+  const D = inp.desired;
+  const newAnn = D * res.perUnit;
+  const totalDsr = (res.E + newAnn) / inp.income * 100;
+
+  let vcls = 'idle', tag = '', head = '희망 대출금액을 입력하면 가능 여부를 판정합니다.', body = '';
+  if (D > 0) {
+    if (D <= res.pmaxDsr + 1e-9 && D <= res.finalLimit + 1e-9) {
+      vcls = 'ok'; tag = '가능';
+      head = '희망금액 ' + fmtMan(D) + ' 취급 가능';
+      body = '신규 포함 DSR ' + totalDsr.toFixed(1) + '% (한도 ' + inp.dsrLimit + '%). 최종 한도까지 ' + fmtFloor(res.finalLimit - D) + ' 여유가 있습니다.';
+    } else if (D <= res.pmaxDsr + 1e-9) {
+      vcls = 'mid'; tag = 'DSR 충족 · 담보 상한 초과';
+      head = res.binding + ' 상한 ' + fmtFloor(res.finalLimit) + '까지 가능';
+      body = 'DSR로는 ' + fmtFloor(res.pmaxDsr) + '까지 가능하지만 ' + res.binding + ' 때문에 희망금액 ' + fmtMan(D) + '은 초과됩니다.';
+    } else {
+      vcls = 'no'; tag = 'DSR 초과';
+      head = '희망금액이 ' + fmtCeil(D - res.pmaxDsr) + ' 초과';
+      body = '신규 포함 DSR ' + totalDsr.toFixed(1) + '%로 한도 ' + inp.dsrLimit + '%를 넘습니다.';
+    }
+  }
+  let html = '<div class="card hero" id="hero"><div class="k">DSR 기준 신규 주담대 최대</div><div class="v">' + fmtFloor(res.pmaxDsr) + '</div>' +
+    '<div class="s">최종 한도 <b>' + fmtFloor(res.finalLimit) + '</b> <span class="chip">' + res.binding + ' 기준</span>' +
+    (res.ltvCap != null ? ' · LTV ' + res.ltv + '% = ' + fmtFloor(res.ltvCap) : '') + (res.priceCap != null ? ' · 가격구간 상한 ' + fmtFloor(res.priceCap) : '') + '</div>' +
+    '<div class="verdict ' + vcls + '">' + (tag ? '<span class="vt">' + tag + '</span>' : '') + '<span class="head">' + head + '</span>' + (body ? '<span class="body">' + body + '</span>' : '') + '</div>' +
+    gaugeHTML(res, res.E, newAnn, inp.income) + '</div>';
+
+  /* 부채 감축 제안 */
+  let target = null, targetNote = '';
+  if (D > 0) { target = D; } else if (res.capsMin != null) { target = res.capsMin; targetNote = '희망금액이 없어 담보 상한(' + fmtFloor(res.capsMin) + ')까지 받는 경우로 계산했습니다.'; }
+  let plan = null;
+  if (target != null) {
+    let teff = target;
+    if (res.capsMin != null && target > res.capsMin) { teff = res.capsMin; targetNote = '희망금액이 담보 상한(' + fmtFloor(res.capsMin) + ')을 넘어 상한 기준으로 계산했습니다.'; }
+    plan = reductionPlan(inp, res, teff);
+    html += '<div class="card"><h2>부채 감축 제안 · 목표 ' + fmtMan(teff) + '</h2>';
+    if (targetNote) html += '<p class="small" style="margin-bottom:8px">' + targetNote + '</p>';
+    if (plan.need <= 0) {
+      html += '<p>현재 부채로 목표 금액이 DSR 안에 들어옵니다. 감축은 필요 없습니다.</p>';
+    } else {
+      html += '<p style="margin-bottom:10px">연 원리금을 <b>' + fmtCeil(plan.need) + '</b> 줄여야 합니다. 감소 효과가 큰 대출부터 상환하는 순서입니다.</p>';
+      if (plan.rows.length) {
+        html += '<div class="tbl-wrap"><table><thead><tr><th>대출</th><th class="n">상환(한도 감액)</th><th class="n">연 원리금 감소</th></tr></thead><tbody>' +
+          plan.rows.map((r, i) => '<tr><td>' + (i + 1) + '. ' + DEBT_TYPES[r.item.d.type].label + ' <span class="chip">' + (r.full ? '전액' : '일부') + '</span></td><td class="n">' + fmtCeil(r.repay) + '</td><td class="n">− ' + fmtMan(r.cut) + '</td></tr>').join('') +
+          '<tr class="total"><td>합계</td><td class="n">' + fmtCeil(plan.totalRepay) + '</td><td class="n">− ' + fmtCeil(plan.need - plan.shortAnnual) + '</td></tr></tbody></table></div>';
+      }
+      if (!plan.covered) {
+        html += '<p style="margin-top:10px" class="down">기존 부채를 모두 상환해도 연 원리금 ' + fmtCeil(plan.shortAnnual) + '가 부족합니다. 대출금액 감액이나 소득 보강이 함께 필요합니다.</p>';
+      }
+      const cutLoan = plan.need / res.perUnit;
+      const needIncome = (res.E + teff * res.perUnit) / res.lim;
+      html += '<h3>다른 방법</h3><div class="opts">' +
+        '<div class="opt"><div class="k">대출 감액</div><div class="v">− ' + fmtCeil(cutLoan) + '</div></div>' +
+        '<div class="opt"><div class="k">필요 연소득</div><div class="v">' + fmtCeil(needIncome) + '</div></div>' +
+        '<div class="opt"><div class="k">부채 상환</div><div class="v">' + (plan.covered ? fmtCeil(plan.totalRepay) : '전액 불가') + '</div></div></div>';
+    }
+    html += '</div>';
+  }
+
+  /* 조건 변경 비교 */
+  const sc = scenarios(inp, res);
+  const mx = Math.max.apply(null, sc.map(s => s.pmax)) || 1;
+  html += '<div class="card"><details><summary>조건을 바꾸면 한도가 얼마나 달라질까</summary><div class="tbl-wrap"><table><thead><tr><th>시나리오</th><th class="n">DSR 기준 한도</th><th class="n">변화</th></tr></thead><tbody>' +
+    sc.map(s => '<tr' + (s.base ? ' class="base"' : '') + '><td>' + s.label + (s.note ? ' <span class="small">' + s.note + '</span>' : '') + '</td><td class="n">' + fmtFloor(s.pmax) + '<div class="bar"><i style="width:' + (s.pmax / mx * 100).toFixed(1) + '%"></i></div></td><td class="n ' + (s.delta > 0.5 ? 'up' : (s.delta < -0.5 ? 'down' : '')) + '">' + (s.base ? '-' : (s.delta >= 0 ? '+' : '') + fmtFloor(s.delta)) + '</td></tr>').join('') +
+    '</tbody></table></div>' +
+    (res.capMat ? '<p class="small" style="margin-top:8px">수도권·규제지역 주택구입 주담대는 DSR 만기를 30년으로 제한하는 가정이라 30년 초과 만기는 효과가 없습니다.</p>' : '') + '</details></div>';
+
+  /* 산출 근거 */
+  const addTxt = res.S + '%p × ' + res.base + '% × ' + res.tr + '% = ' + res.add.toFixed(2) + '%p';
+  html += '<div class="card"><details><summary>산출 근거</summary><div class="tbl-wrap"><table><tbody>' +
+    '<tr><td>DSR 한도금액</td><td class="n">' + fmtMan(inp.income) + ' × ' + inp.dsrLimit + '% = <b>' + fmtMan(res.capAnnual) + '</b></td></tr>' +
+    '<tr><td>기존 부채 연 원리금</td><td class="n">− ' + fmtMan(res.E) + '</td></tr>' +
+    '<tr class="total"><td>가용 연 원리금</td><td class="n">' + fmtMan(Math.max(res.allowed, 0)) + '</td></tr>' +
+    '<tr><td>스트레스 가산</td><td class="n">' + addTxt + '</td></tr>' +
+    '<tr><td>심사금리</td><td class="n">' + inp.rate.toFixed(2) + '% + ' + res.add.toFixed(2) + '%p = <b>' + res.rDsr.toFixed(2) + '%</b></td></tr>' +
+    '<tr><td>DSR 산정 기간</td><td class="n">만기 ' + res.effTerm + '년' + (res.capMat && inp.term > 30 ? ' (30년 제한)' : '') + (res.effGrace > 0 ? ' · 거치 ' + res.effGrace + '년' : '') + ' · ' + METHODS[inp.method] + '</td></tr>' +
+    '<tr><td>1억원당 연 원리금</td><td class="n">' + fmtMan(res.perUnit * 10000) + ' <span class="small">(가산 전 ' + fmtMan(res.perUnitNoStress * 10000) + ')</span></td></tr>' +
+    '</tbody></table></div>' +
+    (res.items.length ? '<h3>기존 부채별 연 원리금</h3><div class="tbl-wrap"><table><thead><tr><th>부채</th><th class="n">반영 원금</th><th class="n">연 원리금</th></tr></thead><tbody>' +
+      res.items.map(x => '<tr><td>' + DEBT_TYPES[x.d.type].label + '</td><td class="n">' + fmtMan(x.principal) + '</td><td class="n">' + fmtMan(x.annual) + '</td></tr>').join('') +
+      '</tbody></table></div>' : '') + '</details></div>';
+
+  /* 복사 + 가정 */
+  html += '<div class="card"><div class="row"><span class="small">상담 메모용 요약</span><button type="button" id="btnCopy" class="primary">결과 요약 복사</button></div><div id="copyFallback" hidden></div></div>';
+  html += '<div class="card"><details><summary>계산 가정과 확인이 필요한 항목</summary><ul class="assume">' +
+    '<li>스트레스 가산 = 스트레스 금리 × 기본 적용비율 × 금리유형 반영비율. 수도권·규제지역 주담대는 3.0%·100%, 지방 주담대는 1.5%·50%(2026년 말까지 유예)로 둡니다.</li>' +
+    '<li>규제지역은 서울 전역과 경기 15곳(과천, 광명, 성남 3개구, 수원 영통·장안·팔달, 안양 동안, 용인 수지·기흥, 의왕, 하남, 구리, 화성 동탄구)입니다. 이후 변경은 세부 기준의 규제지역 여부로 맞추세요.</li>' +
+    '<li>금리유형은 변동형(금융채 6개월물)과 주기형(금융채 5년물) 두 가지입니다. 변동형은 100%, 주기형은 30%로 두었고, 주기형은 만기 대비 고정기간에 따라 20~40% 범위라 은행 내규로 수정하세요.</li>' +
+    '<li>가격구간 상한(15억 이하 6억, 15~25억 4억, 25억 초과 2억)은 2025.10.15 대책 기준이며 정책대출·중도금·이주비는 제외입니다.</li>' +
+    '<li>수도권·규제지역 구입 주담대 DSR 만기 30년 제한은 공식 자료로 재확인하지 못한 가정입니다.</li>' +
+    '<li>LTV 기본값은 무주택 규제지역 40%·비규제 70%, 생애최초 70%입니다. 서민실수요 우대 등은 직접 수정하세요.</li>' +
+    '<li>정확한 심사 결과는 여신 시스템과 최신 내규가 우선합니다. 이 계산은 사전 상담용 추정치입니다.</li></ul></details></div>';
+  out.innerHTML = html;
+
+  /* 하단 요약 바 */
+  const dcls = vcls === 'idle' ? '' : vcls;
+  dock.innerHTML = '<div><div class="k">DSR 기준 신규 주담대 최대</div><div class="v">' + fmtFloor(res.pmaxDsr) + '</div></div>' +
+    '<div class="r">' + (D > 0 ? '<span class="dot ' + dcls + '"></span>' + tag + '<div class="small">신규 포함 DSR ' + totalDsr.toFixed(1) + '%</div>' : '<div class="small">최종 한도 ' + fmtFloor(res.finalLimit) + '</div>') + '</div>';
+
+  const lines = [];
+  lines.push('[주담대 DSR 시뮬레이션] ' + $('sido').value + ' ' + ($('sgg').value || '') + ' (' + (inp.regInfo.reg ? '규제지역' : (inp.regInfo.metro ? '수도권 비규제' : '비수도권')) + ') · 연소득 ' + fmtMan(inp.income));
+  lines.push('신규 ' + (D > 0 ? fmtMan(D) : '금액 미입력') + ' / 금리 ' + inp.rate + '% / ' + inp.term + '년 / 거치 ' + inp.grace + '년 / ' + METHODS[inp.method] + ' / ' + TYPE_RATIOS[inp.rateType].label);
+  lines.push('심사금리 ' + res.rDsr.toFixed(2) + '% (가산 ' + res.add.toFixed(2) + '%p), 기존 부채 연 원리금 ' + fmtMan(res.E));
+  lines.push('DSR 기준 최대 ' + fmtFloor(res.pmaxDsr) + ' / 최종 한도 ' + fmtFloor(res.finalLimit) + ' (' + res.binding + ' 기준)');
+  if (D > 0) lines.push('신규 포함 DSR ' + totalDsr.toFixed(1) + '% (한도 ' + inp.dsrLimit + '%)');
+  if (plan && plan.need > 0) lines.push('목표 ' + fmtMan(plan.target) + ' 위해 연 원리금 ' + fmtCeil(plan.need) + ' 감축 필요: ' + (plan.rows.length ? plan.rows.map(r => DEBT_TYPES[r.item.d.type].label + ' ' + fmtCeil(r.repay) + ' 상환').join(', ') : '상환 대상 없음') + (plan.covered ? '' : ' (전액 상환해도 부족)'));
+  window.__summary = lines.join('\n');
+}
+
+function refresh() { updateRegion(); render(); save(); }
+
+document.addEventListener('click', e => {
+  const t = e.target.closest ? (e.target.closest('button') || e.target) : e.target;
+  if (t.id === 'btnCopy') {
+    const text = window.__summary || '';
+    const fb = $('copyFallback');
+    const fallback = () => { fb.hidden = false; fb.innerHTML = '<textarea class="copybox" id="copyText" readonly></textarea>'; $('copyText').value = text; $('copyText').select(); };
+    try {
+      navigator.clipboard.writeText(text).then(() => { t.textContent = '복사됨'; setTimeout(() => { t.textContent = '결과 요약 복사'; }, 1500); }, fallback);
+    } catch (err) { fallback(); }
+  } else if (t.dataset && t.dataset.t) {
+    const el = $(t.dataset.t);
+    const cur = parseFloat(el.value) || 0;
+    let nv = cur + parseFloat(t.dataset.v);
+    if (t.dataset.max) nv = Math.min(nv, parseFloat(t.dataset.max));
+    el.value = String(Math.round(nv * 100) / 100);
+    refresh();
+  } else if (t.classList && t.classList.contains('rm')) {
+    t.closest('.debt').remove(); refresh();
+  } else if (t.id === 'btnAdd') {
+    addDebt(); refresh();
+  } else if (t.id === 'btnReset') {
+    setForm(EXAMPLE); refresh();
+  } else if (e.target.closest && e.target.closest('#dockIn')) {
+    const h = $('hero');
+    if (h && h.scrollIntoView) { try { h.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (err) { h.scrollIntoView(); } }
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'sido') { fillSgg(); refresh(); return; }
+  if (t.classList && t.classList.contains('d-type')) {
+    const row = t.closest('.debt'), def = DEBT_TYPES[t.value];
+    row.querySelector('.d-method').value = def.method;
+    row.querySelector('.d-term').value = def.term;
+    row.querySelector('.d-rate').value = def.rate;
+    row.querySelector('.d-ballab').textContent = t.value === 'overdraft' ? '약정한도' : '잔액';
+    refresh();
+  }
+});
+['f', 'adv'].forEach(id => {
+  $(id).addEventListener('input', refresh);
+  $(id).addEventListener('change', refresh);
+  $(id).addEventListener('submit', e => e.preventDefault());
+});
+
+(function init() {
+  const saved = load();
+  setForm(saved && saved.f && saved.f.sido ? saved : EXAMPLE);
+  updateRegion();
+  render();
+})();
+</script>
+</html>
